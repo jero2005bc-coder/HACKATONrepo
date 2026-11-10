@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>El Misterio de las Funciones - Mazmorra Neón</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cyberDark: '#04060a',
+                        cyberPanel: '#0a0f1d',
+                        cyberBorder: '#1e293b',
+                        neonGreen: '#a3e635',
+                        neonCyan: '#06b6d4',
+                        neonPurple: '#c084fc',
+                        neonPink: '#f43f5e',
+                        neonYellow: '#facc15'
+                    },
+                    fontFamily: {
+                        mono: ['VT323', 'Courier New', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #04060a;
+            color: #f3f4f6;
+            user-select: none;
+            overflow-x: hidden;
+            font-family: 'VT323', monospace;
+        }
+
+        /* CRT Glitch & Scanline Effect */
+        .crt-overlay {
+            background: linear-gradient(
+                rgba(18, 16, 16, 0) 50%, 
+                rgba(0, 0, 0, 0.35) 50%
+            ), linear-gradient(
+                90deg,
+                rgba(255, 0, 0, 0.03),
+                rgba(0, 255, 0, 0.01),
+                rgba(0, 0, 255, 0.03)
+            );
+            background-size: 100% 4px, 6px 100%;
+            pointer-events: none;
+        }
+
+        /* Retro Neon Glow Effect */
+        .glow-neon {
+            box-shadow: 0 0 20px rgba(163, 230, 53, 0.3), inset 0 0 10px rgba(163, 230, 53, 0.2);
+        }
+
+        /* Interactive Knobs / Sliders Custom Styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: #0f172a;
+            height: 8px;
+            border-radius: 4px;
+            border: 1px solid #06b6d4;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 14px;
+            border-radius: 2px;
+            background: #a3e635;
+            cursor: pointer;
+            box-shadow: 0 0 8px #a3e635;
+        }
+
+        /* Pixelated canvas rendering */
+        canvas {
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-between p-2 md:p-4 relative">
+
+    <!-- CRT SCANLINE LAYER -->
+    <div class="fixed inset-0 crt-overlay z-40"></div>
+
+    <!-- RETRO HEADER -->
+    <header class="w-full max-w-5xl bg-cyberPanel border-2 border-slate-800 p-3 md:p-4 rounded-xl mb-3 shadow-2xl flex flex-wrap justify-between items-center z-10">
+        <div>
+            <div class="flex items-center space-x-2">
+                <span class="inline-block w-2.5 h-2.5 bg-neonGreen rounded-full animate-ping"></span>
+                <span class="text-sm uppercase tracking-widest text-neonGreen">AWS GameJam // Protocolo Mazmorra v2.4</span>
+            </div>
+            <h1 class="text-2xl md:text-3xl font-bold text-white tracking-wider text-neonGreen">EL MISTERIO DE LAS FUNCIONES</h1>
+        </div>
+
+        <div class="flex items-center space-x-3 mt-3 sm:mt-0">
+            <button id="musicToggleBtn" onclick="toggleMusic()" class="px-3 py-1 text-sm bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded text-slate-300">
+                🎵 Synth: ON
+            </button>
+            <button id="sfxToggleBtn" onclick="toggleSFX()" class="px-3 py-1 text-sm bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded text-slate-300">
+                🔊 SFX: ON
+            </button>
+            <button onclick="resetCurrentLevel()" class="px-3 py-1 text-sm bg-rose-950/80 hover:bg-rose-900 border border-rose-700 rounded text-rose-300">
+                🔄 Reiniciar
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN GAME LAYOUT -->
+    <main class="w-full max-w-5xl flex flex-col lg:flex-row gap-4 items-stretch justify-center relative z-10">
+
+        <!-- DISPLAY CANVAS -->
+        <div class="relative flex-1 flex flex-col items-center justify-center bg-cyberPanel border-2 border-slate-800 p-3 rounded-xl shadow-2xl">
+            
+            <div class="relative w-full aspect-square max-w-[500px] flex items-center justify-center overflow-hidden rounded-lg border-2 border-slate-900 bg-black">
+                <canvas id="gameCanvas" width="500" height="500" class="w-full h-full object-contain cursor-pointer"></canvas>
+                
+                <!-- PROMPT -->
+                <div id="interactionPrompt" class="absolute bottom-4 bg-neonGreen text-black px-4 py-1 text-sm font-bold shadow-lg animate-bounce hidden rounded">
+                    ⚡ Presiona [E] o Toca la Máquina
+                </div>
+            </div>
+
+            <!-- LEVEL PROGRESS BAR -->
+            <div class="w-full max-w-[500px] mt-3">
+                <div class="flex justify-between text-sm text-slate-400 mb-1">
+                    <span>Estado del Sector</span>
+                    <span id="levelProgressText" class="text-neonGreen">Sector 1 / 4</span>
+                </div>
+                <div class="w-full bg-slate-900 h-3 rounded border border-slate-800 p-0.5">
+                    <div id="levelProgressBar" class="bg-gradient-to-r from-neonCyan via-neonGreen to-neonYellow h-full w-1/4 transition-all duration-500 rounded-sm"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CONTROL PANEL / SIDEBAR -->
+        <aside class="w-full lg:w-80 bg-cyberPanel border-2 border-slate-800 p-4 rounded-xl flex flex-col justify-between">
+            <div>
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
+                    <h2 class="text-base font-bold text-neonGreen uppercase">🎯 Protocolo Actual</h2>
+                    <span id="mapBadge" class="text-xs bg-slate-900 text-neonCyan px-2 py-0.5 rounded border border-slate-700">Sector 1</span>
+                </div>
+                
+                <p id="objectiveText" class="text-sm text-slate-300 leading-relaxed mb-4">
+                    Localiza el nodo de la función y sincroniza la frecuencia de salida.
+                </p>
+
+                <!-- MINIMAP -->
+                <div class="bg-black p-2 rounded-lg border border-slate-800 mb-4 flex items-center justify-between">
+                    <div>
+                        <div class="text-xs text-slate-500 uppercase">Radar De Proximidad</div>
+                        <div class="text-xs text-slate-400 mt-1">🟢 Runner &nbsp; 🟦 Terminal &nbsp; 🔴 Compuerta</div>
+                    </div>
+                    <canvas id="minimapCanvas" width="70" height="70" class="bg-black rounded border border-slate-800"></canvas>
+                </div>
+
+                <!-- CONSOLE LOG -->
+                <h2 class="text-xs font-bold text-neonCyan uppercase mb-2">🖥️ Consola de Eventos</h2>
+                <div id="consoleLog" class="h-32 bg-black border border-slate-900 p-2 rounded text-xs space-y-1 font-mono overflow-y-auto text-slate-400">
+                    <p class="text-neonGreen">> Enlace neuronal activo...</p>
+                </div>
+            </div>
+
+            <!-- JOYPAD MOBIL -->
+            <div class="mt-4 pt-3 border-t border-slate-800 block md:hidden">
+                <div class="text-center text-xs text-slate-500 uppercase mb-2">Controles Táctiles</div>
+                <div class="grid grid-cols-3 gap-1.5 w-44 mx-auto">
+                    <div></div>
+                    <button onclick="movePlayer(0, -1)" class="bg-slate-900 active:bg-neonGreen active:text-black py-2 rounded text-center text-base font-bold border border-slate-700">▲</button>
+                    <div></div>
+                    <button onclick="movePlayer(-1, 0)" class="bg-slate-900 active:bg-neonGreen active:text-black py-2 rounded text-center text-base font-bold border border-slate-700">◄</button>
+                    <button onclick="interactTile()" class="bg-neonGreen text-black font-bold text-xs rounded flex items-center justify-center">E</button>
+                    <button onclick="movePlayer(1, 0)" class="bg-slate-900 active:bg-neonGreen active:text-black py-2 rounded text-center text-base font-bold border border-slate-700">►</button>
+                    <div></div>
+                    <button onclick="movePlayer(0, 1)" class="bg-slate-900 active:bg-neonGreen active:text-black py-2 rounded text-center text-base font-bold border border-slate-700">▼</button>
+                    <div></div>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- INTERACTIVE FUNCTION TERMINAL MODAL -->
+    <div id="machineModal" class="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-cyberPanel border-2 border-neonGreen w-full max-w-lg rounded-xl p-5 shadow-2xl relative glow-neon">
+            
+            <!-- Header -->
+            <div class="flex justify-between items-start mb-3 border-b border-slate-800 pb-2">
+                <div>
+                    <span id="modalBadge" class="text-xs bg-neonGreen/20 text-neonGreen px-2 py-0.5 rounded font-semibold uppercase">Función #1</span>
+                    <h3 id="modalTitle" class="text-xl font-bold text-white mt-1">Terminal de Control</h3>
+                </div>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-white text-2xl">✕</button>
+            </div>
+
+            <!-- Description & Formula -->
+            <div class="bg-black border border-slate-800 p-3 rounded mb-4 text-xs">
+                <p id="modalDescription" class="mb-2 text-slate-300">Cargando datos...</p>
+                <div class="bg-slate-950 p-2 rounded text-center font-mono text-neonGreen text-base border border-neonGreen/40" id="modalFormula">
+                    f(x) = ?
+                </div>
+            </div>
+
+            <!-- Interactive Hardware Inputs -->
+            <div id="modalInputs" class="space-y-3 mb-4"></div>
+
+            <!-- Animated Data Flow Pipeline -->
+            <div class="bg-black border border-slate-800 p-3 rounded mb-5">
+                <div class="text-xs text-slate-500 uppercase tracking-widest mb-1 text-center">Simulación Flujo de Señal</div>
+                <div class="flex items-center justify-around text-sm font-mono">
+                    <div class="text-center">
+                        <span class="block text-slate-500 text-xs">Entrada</span>
+                        <span id="visInput" class="text-neonCyan font-bold">?</span>
+                    </div>
+                    <div class="text-neonYellow animate-pulse">⚡ f() ⚡</div>
+                    <div class="text-center">
+                        <span class="block text-slate-500 text-xs">Resultado</span>
+                        <span id="visOutput" class="text-neonGreen font-bold">?</span>
+                    </div>
+                    <div class="text-slate-600">➔</div>
+                    <div class="text-center">
+                        <span class="block text-slate-500 text-xs">Meta</span>
+                        <span id="visTarget" class="text-neonPurple font-bold">?</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex gap-3">
+                <button onclick="executeFunctionMachine()" class="flex-1 bg-neonGreen hover:bg-lime-400 text-black font-bold py-2.5 rounded transition text-base shadow-lg">
+                    ⚡ TRANSMITIR SEÑAL
+                </button>
+                <button onclick="closeModal()" class="bg-slate-900 hover:bg-slate-800 text-slate-300 px-4 py-2.5 rounded text-sm">
+                    Salir
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- VICTORY OVERLAY -->
+    <div id="victoryModal" class="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-cyberPanel border-2 border-neonGreen w-full max-w-md rounded-xl p-6 text-center shadow-2xl glow-neon">
+            <div class="w-16 h-16 bg-neonGreen/20 text-neonGreen rounded-full flex items-center justify-center mx-auto mb-3 text-3xl animate-bounce">
+                👾
+            </div>
+            <h2 class="text-3xl font-bold text-white mb-2 text-neonGreen">¡NÚCLEO LIBERADO!</h2>
+            <p class="text-sm text-slate-300 mb-6 leading-relaxed">
+                Has completado la **Mazmorra de la Nube** resolviendo las transformaciones de funciones complejas.
+            </p>
+            <button onclick="restartFullGame()" class="w-full bg-neonGreen hover:bg-lime-400 text-black font-bold py-3 rounded transition text-base">
+                🎮 REINICIAR SISTEMA
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /* ==========================================
+           PROCEDURAL CHIPTUNE AUDIO SYNTH
+           ========================================== */
+        let audioCtx = null;
+        let musicEnabled = true;
+        let sfxEnabled = true;
+        let musicTimer = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                startSynthMusic();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function toggleMusic() {
+            musicEnabled = !musicEnabled;
+            document.getElementById('musicToggleBtn').innerText = musicEnabled ? '🎵 Synth: ON' : '🔇 Synth: OFF';
+        }
+
+        function toggleSFX() {
+            sfxEnabled = !sfxEnabled;
+            document.getElementById('sfxToggleBtn').innerText = sfxEnabled ? '🔊 SFX: ON' : '🔇 SFX: OFF';
+        }
+
+        // Cyberpunk Arpeggiator Music Loop
+        function startSynthMusic() {
+            const scale = [110, 130.81, 146.83, 164.81, 196.00, 220.00];
+            let noteIdx = 0;
+
+            musicTimer = setInterval(() => {
+                if (!musicEnabled || !audioCtx) return;
+                try {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sawtooth';
+                    
+                    const freq = scale[noteIdx % scale.length];
+                    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                    
+                    gain.gain.setValueAtTime(0.015, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.2);
+                    
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.2);
+                    noteIdx++;
+                } catch(e){}
+            }, 180);
+        }
+
+        function playSound(type) {
+            if (!sfxEnabled) return;
+            initAudio();
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+
+            if (type === 'step') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(120, now);
+                gain.gain.setValueAtTime(0.02, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.03);
+                osc.start(now);
+                osc.stop(now + 0.03);
+            } else if (type === 'interact') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.linearRampToValueAtTime(800, now + 0.08);
+                gain.gain.setValueAtTime(0.06, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.08);
+                osc.start(now);
+                osc.stop(now + 0.08);
+            } else if (type === 'success') {
+                [440, 554.37, 659.25, 880].forEach((f, i) => {
+                    const o = audioCtx.createOscillator();
+                    const g = audioCtx.createGain();
+                    o.type = 'square';
+                    o.frequency.setValueAtTime(f, now + i*0.06);
+                    g.gain.setValueAtTime(0.04, now + i*0.06);
+                    g.gain.linearRampToValueAtTime(0, now + i*0.06 + 0.1);
+                    o.connect(g);
+                    g.connect(audioCtx.destination);
+                    o.start(now + i*0.06);
+                    o.stop(now + i*0.06 + 0.1);
+                });
+            } else if (type === 'error') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.linearRampToValueAtTime(90, now + 0.15);
+                gain.gain.setValueAtTime(0.08, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.15);
+                osc.start(now);
+                osc.stop(now + 0.15);
+            }
+        }
+
+        /* ==========================================
+           GAME STATE & MAP ENGINE
+           ========================================== */
+        const GRID_SIZE = 10;
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const tileSize = canvas.width / GRID_SIZE;
+
+        const minimapCanvas = document.getElementById('minimapCanvas');
+        const miniCtx = minimapCanvas.getContext('2d');
+
+        let currentLevelIndex = 0;
+        let activeMachineObj = null;
+        let frameTick = 0;
+
+        let player = {
+            x: 1, y: 1,
+            renderX: 1 * tileSize, renderY: 1 * tileSize,
+            dir: 'down'
+        };
+
+        const levels = [
+            {
+                name: "Sector 1: Multiplicador de Voltaje",
+                objective: "Ajusta la variable 'x' en la función $f(x) = 2x + 5$ para obtener una potencia de 21.",
+                grid: [
+                    [1,1,1,1,1,1,1,1,1,1],
+                    [1,0,0,0,1,0,0,0,0,1],
+                    [1,0,1,0,1,0,1,1,0,1],
+                    [1,0,1,0,0,0,0,1,0,1],
+                    [1,0,1,1,1,1,0,1,0,1],
+                    [1,0,0,0,0,2,0,1,0,1],
+                    [1,1,1,1,1,1,0,1,0,1],
+                    [1,0,0,0,0,0,0,0,0,1],
+                    [1,0,1,1,1,1,3,1,1,1],
+                    [1,1,1,1,1,1,4,1,1,1]
+                ],
+                start: { x: 1, y: 1 },
+                door: { x: 6, y: 8 },
+                doorOpen: false,
+                machine: {
+                    x: 5, y: 5,
+                    title: "Sintetizador Lineal",
+                    badge: "Función Lineal",
+                    description: "Se requiere un valor de salida f(x) = 21 para energizar el solenoide de la puerta.",
+                    formula: "f(x) = 2 * x + 5",
+                    inputs: [
+                        { name: "x", label: "Perilla Reguladora (x)", type: "range", min: 0, max: 20, default: 4 }
+                    ],
+                    targetDisplay: "21",
+                    evaluate: (vals) => {
+                        const x = parseFloat(vals.x);
+                        const result = 2 * x + 5;
+                        return { output: result, isCorrect: result === 21 };
+                    }
+                }
+            },
+            {
+                name: "Sector 2: Filtro de Residuo Módulo",
+                objective: "Genera un residuo de 4 en la función $f(x) = x \\bmod 7$. La variable $x$ debe ser mayor que 10.",
+                grid: [
+                    [1,1,1,1,1,1,1,1,1,1],
+                    [1,0,0,0,0,0,1,0,0,1],
+                    [1,0,1,1,1,0,1,0,1,1],
+                    [1,0,1,0,0,0,0,0,0,1],
+                    [1,0,1,0,2,1,1,1,0,1],
+                    [1,0,0,0,0,0,0,1,0,1],
+                    [1,1,1,1,1,1,0,1,0,1],
+                    [1,0,0,0,0,0,0,0,0,1],
+                    [1,1,1,3,1,1,1,1,1,1],
+                    [1,1,1,4,1,1,1,1,1,1]
+                ],
+                start: { x: 1, y: 1 },
+                door: { x: 3, y: 8 },
+                doorOpen: false,
+                machine: {
+                    x: 4, y: 4,
+                    title: "Desfasador de Módulo",
+                    badge: "Operación Módulo",
+                    description: "Encuentra una frecuencia entera 'x' superior a 10 cuyo residuo dividido por 7 sea exactamente 4.",
+                    formula: "f(x) = x % 7",
+                    inputs: [
+                        { name: "x", label: "Frecuencia x (> 10)", type: "number", default: 11 }
+                    ],
+                    targetDisplay: "4",
+                    evaluate: (vals) => {
+                        const x = parseInt(vals.x);
+                        const result = x % 7;
+                        const isCorrect = (result === 4) && (x > 10);
+                        return { output: result, isCorrect: isCorrect };
+                    }
+                }
+            },
+            {
+                name: "Sector 3: Mapeo y Filtrado de Arrays",
+                objective: "Procesa un arreglo: $f(arr) = arr.map(x \\Rightarrow x * 2).filter(x \\Rightarrow x > 10)$. Debe devolver exactamente 2 elementos.",
+                grid: [
+                    [1,1,1,1,1,1,1,1,1,1],
+                    [1,0,1,0,0,0,0,0,0,1],
+                    [1,0,1,0,1,1,1,1,0,1],
+                    [1,0,0,0,1,2,0,0,0,1],
+                    [1,1,1,0,1,1,1,1,0,1],
+                    [1,0,0,0,0,0,0,1,0,1],
+                    [1,0,1,1,1,1,0,1,0,1],
+                    [1,0,0,0,0,1,0,0,0,1],
+                    [1,1,1,1,0,1,1,3,1,1],
+                    [1,1,1,1,0,1,1,4,1,1]
+                ],
+                start: { x: 1, y: 1 },
+                door: { x: 7, y: 8 },
+                doorOpen: false,
+                machine: {
+                    x: 5, y: 3,
+                    title: "Matriz de Transformación DataStream",
+                    badge: "Array Map & Filter",
+                    description: "Ajusta 3 valores en el vector. La función duplica cada elemento y descarta los valores $\\le 10$. Logra que el arreglo resultante tenga 2 elementos.",
+                    formula: "f([a,b,c]) = [a,b,c].map(x=>x*2).filter(x=>x>10)",
+                    inputs: [
+                        { name: "a", label: "Canal A", type: "number", default: 3 },
+                        { name: "b", label: "Canal B", type: "number", default: 6 },
+                        { name: "c", label: "Canal C", type: "number", default: 8 }
+                    ],
+                    targetDisplay: "Largo = 2",
+                    evaluate: (vals) => {
+                        const arr = [parseFloat(vals.a), parseFloat(vals.b), parseFloat(vals.c)];
+                        const processed = arr.map(x => x * 2).filter(x => x > 10);
+                        const isCorrect = processed.length === 2;
+                        return { output: `[${processed.join(', ')}] (L:${processed.length})`, isCorrect: isCorrect };
+                    }
+                }
+            },
+            {
+                name: "Sector 4: Puerta Booleana de Seguridad",
+                objective: "Satisface la condición lógica $f(a,b) = (a > b) \\land (b > 0) \\land (b \\bmod 2 == 0)$ para obtener TRUE.",
+                grid: [
+                    [1,1,1,1,1,1,1,1,1,1],
+                    [1,0,0,0,0,0,1,0,0,1],
+                    [1,0,1,1,1,0,1,0,1,1],
+                    [1,0,1,2,1,0,0,0,0,1],
+                    [1,0,1,0,1,1,1,1,0,1],
+                    [1,0,0,0,0,0,0,1,0,1],
+                    [1,1,1,1,1,0,0,1,0,1],
+                    [1,0,0,0,1,1,0,0,0,1],
+                    [1,0,1,0,0,0,0,1,3,1],
+                    [1,0,1,0,0,0,0,1,4,1]
+                ],
+                start: { x: 1, y: 1 },
+                door: { x: 8, y: 8 },
+                doorOpen: false,
+                machine: {
+                    x: 3, y: 3,
+                    title: "Matriz Lógica AND",
+                    badge: "Lógica Booleana",
+                    description: "Encuentra parámetros 'a' y 'b' que hagan que toda la expresión lógica sea VERDADERA (1).",
+                    formula: "f(a,b) = (a > b) && (b > 0) && (b % 2 === 0)",
+                    inputs: [
+                        { name: "a", label: "Entrada a", type: "number", default: 3 },
+                        { name: "b", label: "Entrada b (Par positivo)", type: "number", default: 2 }
+                    ],
+                    targetDisplay: "VERDADERO (1)",
+                    evaluate: (vals) => {
+                        const a = parseFloat(vals.a);
+                        const b = parseFloat(vals.b);
+                        const isCorrect = (a > b) && (b > 0) && (b % 2 === 0);
+                        return { output: isCorrect ? "TRUE (1)" : "FALSE (0)", isCorrect: isCorrect };
+                    }
+                }
+            }
+        ];
+
+        function initLevel(index) {
+            currentLevelIndex = index;
+            const lvl = levels[currentLevelIndex];
+            player.x = lvl.start.x;
+            player.y = lvl.start.y;
+            player.renderX = player.x * tileSize;
+            player.renderY = player.y * tileSize;
+            lvl.doorOpen = false;
+
+            document.getElementById('levelProgressText').innerText = `Sector ${currentLevelIndex + 1} / ${levels.length}`;
+            document.getElementById('levelProgressBar').style.width = `${((currentLevelIndex + 1) / levels.length) * 100}%`;
+            document.getElementById('mapBadge').innerText = `Sector ${currentLevelIndex + 1}`;
+            document.getElementById('objectiveText').innerText = lvl.objective;
+
+            logConsole(`Entrando a ${lvl.name}...`);
+            renderMinimap();
+        }
+
+        function resetCurrentLevel() {
+            initLevel(currentLevelIndex);
+        }
+
+        function restartFullGame() {
+            document.getElementById('victoryModal').classList.add('hidden');
+            levels.forEach(l => l.doorOpen = false);
+            initLevel(0);
+        }
+
+        function logConsole(msg) {
+            const consoleEl = document.getElementById('consoleLog');
+            const p = document.createElement('p');
+            p.innerText = `> ${msg}`;
+            consoleEl.appendChild(p);
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+
+        /* ==========================================
+           CONTROLS
+           ========================================== */
+        window.addEventListener('keydown', (e) => {
+            initAudio();
+            if (!document.getElementById('machineModal').classList.contains('hidden')) return;
+
+            switch(e.key.toLowerCase()) {
+                case 'w': case 'arrowup': movePlayer(0, -1); break;
+                case 's': case 'arrowdown': movePlayer(0, 1); break;
+                case 'a': case 'arrowleft': movePlayer(-1, 0); break;
+                case 'd': case 'arrowright': movePlayer(1, 0); break;
+                case 'e': case 'f': case ' ': interactTile(); break;
+            }
+        });
+
+        function movePlayer(dx, dy) {
+            const lvl = levels[currentLevelIndex];
+            const newX = player.x + dx;
+            const newY = player.y + dy;
+
+            if (dx > 0) player.dir = 'right';
+            if (dx < 0) player.dir = 'left';
+            if (dy > 0) player.dir = 'down';
+            if (dy < 0) player.dir = 'up';
+
+            if (newX < 0 || newX >= GRID_SIZE || newY < 0 || newY >= GRID_SIZE) return;
+
+            const tile = lvl.grid[newY][newX];
+
+            if (tile === 1) {
+                playSound('error');
+                return;
+            }
+
+            if (tile === 3 && !lvl.doorOpen) {
+                playSound('error');
+                logConsole("Compuerta cerrada. Activa la función del sector.");
+                return;
+            }
+
+            if (tile === 4) {
+                playSound('success');
+                if (currentLevelIndex + 1 < levels.length) {
+                    logConsole("¡Sector desbloqueado! Avanzando al siguiente...");
+                    initLevel(currentLevelIndex + 1);
+                } else {
+                    document.getElementById('victoryModal').classList.remove('hidden');
+                }
+                return;
+            }
+
+            player.x = newX;
+            player.y = newY;
+            playSound('step');
+            renderMinimap();
+            checkInteractionPrompt();
+        }
+
+        function checkInteractionPrompt() {
+            const lvl = levels[currentLevelIndex];
+            const prompt = document.getElementById('interactionPrompt');
+            let near = false;
+
+            const dirs = [[0,0], [1,0], [-1,0], [0,1], [0,-1]];
+            for (let d of dirs) {
+                let nx = player.x + d[0];
+                let ny = player.y + d[1];
+                if (nx >= 0 && nx < GRID_SIZE && ny >= 0 && ny < GRID_SIZE) {
+                    if (lvl.grid[ny][nx] === 2) {
+                        near = true;
+                        break;
+                    }
+                }
+            }
+
+            if (near) prompt.classList.remove('hidden');
+            else prompt.classList.add('hidden');
+        }
+
+        function interactTile() {
+            const lvl = levels[currentLevelIndex];
+            const dirs = [[0,0], [1,0], [-1,0], [0,1], [0,-1]];
+            for (let d of dirs) {
+                let nx = player.x + d[0];
+                let ny = player.y + d[1];
+                if (nx >= 0 && nx < GRID_SIZE && ny >= 0 && ny < GRID_SIZE) {
+                    if (lvl.grid[ny][nx] === 2) {
+                        openMachineModal(lvl.machine);
+                        return;
+                    }
+                }
+            }
+        }
+
+        /* ==========================================
+           CUSTOM PIXEL GRAPHICS RENDERING
+           ========================================== */
+        function renderCanvas() {
+            frameTick++;
+            const lvl = levels[currentLevelIndex];
+
+            // Dark Cyber BG
+            ctx.fillStyle = '#04060a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Interpolate movement
+            player.renderX += (player.x * tileSize - player.renderX) * 0.3;
+            player.renderY += (player.y * tileSize - player.renderY) * 0.3;
+
+            // Render Map Grid
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const tile = lvl.grid[r][c];
+                    const x = c * tileSize;
+                    const y = r * tileSize;
+
+                    // Subtle Grid Lines
+                    ctx.strokeStyle = '#0a0f1d';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(x, y, tileSize, tileSize);
+
+                    if (tile === 1) {
+                        // Cyber Wall Block with circuit pattern
+                        ctx.fillStyle = '#0f172a';
+                        ctx.fillRect(x + 1, y + 1, tileSize - 2, tileSize - 2);
+                        ctx.strokeStyle = '#1e293b';
+                        ctx.strokeRect(x + 3, y + 3, tileSize - 6, tileSize - 6);
+
+                        // Decorative corner node
+                        ctx.fillStyle = '#06b6d4';
+                        ctx.fillRect(x + 6, y + 6, 4, 4);
+                    } else if (tile === 2) {
+                        // FUNCTION MACHINE - CRT RETRO COMPUTER SPRITE
+                        ctx.fillStyle = '#0f172a';
+                        ctx.fillRect(x + 4, y + 4, tileSize - 8, tileSize - 8);
+
+                        // CRT Screen Glowing Green
+                        const glow = Math.sin(frameTick * 0.1) * 3;
+                        ctx.fillStyle = '#000';
+                        ctx.fillRect(x + 8, y + 8, tileSize - 16, tileSize - 20);
+
+                        ctx.fillStyle = '#a3e635';
+                        ctx.shadowColor = '#a3e635';
+                        ctx.shadowBlur = 6 + glow;
+                        ctx.font = '14px VT323, monospace';
+                        ctx.textAlign = 'center';
+                        ctx.fillText('f(x)', x + tileSize / 2, y + tileSize / 2 + 2);
+                        ctx.shadowBlur = 0;
+
+                        // Sparks animation
+                        if (frameTick % 20 < 10) {
+                            ctx.fillStyle = '#06b6d4';
+                            ctx.fillRect(x + tileSize/2 - 2, y + 4, 4, 2);
+                        }
+                    } else if (tile === 3) {
+                        // DOOR COMPUERTA
+                        if (lvl.doorOpen) {
+                            ctx.fillStyle = '#064e3b';
+                            ctx.fillRect(x + 8, y + 2, tileSize - 16, tileSize - 4);
+                            ctx.strokeStyle = '#a3e635';
+                            ctx.strokeRect(x + 8, y + 2, tileSize - 16, tileSize - 4);
+                        } else {
+                            ctx.fillStyle = '#881337';
+                            ctx.fillRect(x + 4, y + 4, tileSize - 8, tileSize - 8);
+                            ctx.strokeStyle = '#f43f5e';
+                            ctx.shadowColor = '#f43f5e';
+                            ctx.shadowBlur = 8;
+                            ctx.strokeRect(x + 4, y + 4, tileSize - 8, tileSize - 8);
+                            ctx.shadowBlur = 0;
+
+                            // Laser bars
+                            ctx.fillStyle = '#f43f5e';
+                            ctx.fillRect(x + 10, y + 12, tileSize - 20, 3);
+                            ctx.fillRect(x + 10, y + 24, tileSize - 20, 3);
+                            ctx.fillRect(x + 10, y + 36, tileSize - 20, 3);
+                        }
+                    } else if (tile === 4) {
+                        // EXIT PORTAL
+                        const pulse = Math.sin(frameTick * 0.15) * 4;
+                        ctx.fillStyle = '#a3e635';
+                        ctx.shadowColor = '#a3e635';
+                        ctx.shadowBlur = 12 + pulse;
+                        ctx.beginPath();
+                        ctx.arc(x + tileSize/2, y + tileSize/2, tileSize/3.5, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.shadowBlur = 0;
+                    }
+                }
+            }
+
+            // LIGHTING EFFECT / FOG OF WAR AROUND PLAYER
+            const px = player.renderX + tileSize / 2;
+            const py = player.renderY + tileSize / 2;
+            
+            const grad = ctx.createRadialGradient(px, py, 20, px, py, 140);
+            grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+            grad.addColorStop(1, 'rgba(4, 6, 10, 0.55)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // RENDER PLAYER CHARACTER (CYBER-RUNNER SPRITE)
+            ctx.shadowColor = '#a3e635';
+            ctx.shadowBlur = 10;
+            
+            // Cyber Body Frame
+            ctx.fillStyle = '#a3e635';
+            ctx.fillRect(px - 10, py - 12, 20, 24);
+
+            // Head & Visor
+            ctx.fillStyle = '#04060a';
+            ctx.fillRect(px - 8, py - 10, 16, 8);
+            
+            ctx.fillStyle = '#06b6d4';
+            const eyeOffset = player.dir === 'right' ? 2 : (player.dir === 'left' ? -2 : 0);
+            ctx.fillRect(px - 4 + eyeOffset, py - 8, 8, 3);
+
+            // Legs Animation
+            const legWalk = Math.sin(frameTick * 0.4) * 4;
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(px - 7, py + 12, 5, 6 + legWalk);
+            ctx.fillRect(px + 2, py + 12, 5, 6 - legWalk);
+
+            ctx.shadowBlur = 0;
+
+            requestAnimationFrame(renderCanvas);
+        }
+
+        /* ==========================================
+           MINIMAP
+           ========================================== */
+        function renderMinimap() {
+            const lvl = levels[currentLevelIndex];
+            const mSize = minimapCanvas.width / GRID_SIZE;
+
+            miniCtx.fillStyle = '#000';
+            miniCtx.fillRect(0, 0, minimapCanvas.width, minimapCanvas.height);
+
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const tile = lvl.grid[r][c];
+                    const mx = c * mSize;
+                    const my = r * mSize;
+
+                    if (tile === 1) {
+                        miniCtx.fillStyle = '#1e293b';
+                        miniCtx.fillRect(mx, my, mSize, mSize);
+                    } else if (tile === 2) {
+                        miniCtx.fillStyle = '#06b6d4';
+                        miniCtx.fillRect(mx + 1, my + 1, mSize - 2, mSize - 2);
+                    } else if (tile === 3) {
+                        miniCtx.fillStyle = lvl.doorOpen ? '#a3e635' : '#f43f5e';
+                        miniCtx.fillRect(mx + 1, my + 1, mSize - 2, mSize - 2);
+                    }
+                }
+            }
+
+            // Player Dot
+            miniCtx.fillStyle = '#a3e635';
+            miniCtx.beginPath();
+            miniCtx.arc(player.x * mSize + mSize/2, player.y * mSize + mSize/2, mSize/2, 0, Math.PI*2);
+            miniCtx.fill();
+        }
+
+        /* ==========================================
+           MODAL & HARDWARE CONTROLS
+           ========================================== */
+        function openMachineModal(machine) {
+            playSound('interact');
+            activeMachineObj = machine;
+
+            document.getElementById('modalTitle').innerText = machine.title;
+            document.getElementById('modalBadge').innerText = machine.badge;
+            document.getElementById('modalDescription').innerText = machine.description;
+            document.getElementById('modalFormula').innerText = machine.formula;
+            document.getElementById('visTarget').innerText = machine.targetDisplay;
+
+            document.getElementById('visInput').innerText = '?';
+            document.getElementById('visOutput').innerText = '?';
+
+            const inputsContainer = document.getElementById('modalInputs');
+            inputsContainer.innerHTML = '';
+
+            machine.inputs.forEach(inp => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'flex flex-col gap-1 bg-black p-2 rounded border border-slate-900';
+
+                const head = document.createElement('div');
+                head.className = 'flex justify-between text-xs text-slate-400';
+                head.innerHTML = `<span>${inp.label}</span><span id="val_disp_${inp.name}" class="text-neonCyan font-bold">${inp.default}</span>`;
+
+                let inputEl;
+                if (inp.type === 'range') {
+                    inputEl = document.createElement('input');
+                    inputEl.type = 'range';
+                    inputEl.min = inp.min;
+                    inputEl.max = inp.max;
+                    inputEl.value = inp.default;
+                } else {
+                    inputEl = document.createElement('input');
+                    inputEl.type = 'number';
+                    inputEl.value = inp.default;
+                    inputEl.className = 'bg-slate-950 border border-slate-700 rounded p-1.5 text-sm text-neonGreen font-mono focus:border-neonGreen focus:outline-none';
+                }
+
+                inputEl.id = `input_${inp.name}`;
+                inputEl.addEventListener('input', (e) => {
+                    const disp = document.getElementById(`val_disp_${inp.name}`);
+                    if (disp) disp.innerText = e.target.value;
+                    updateVisualizer();
+                });
+
+                wrapper.appendChild(head);
+                wrapper.appendChild(inputEl);
+                inputsContainer.appendChild(wrapper);
+            });
+
+            updateVisualizer();
+            document.getElementById('machineModal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('machineModal').classList.add('hidden');
+        }
+
+        function updateVisualizer() {
+            if (!activeMachineObj) return;
+            const inputVals = {};
+            activeMachineObj.inputs.forEach(inp => {
+                const val = document.getElementById(`input_${inp.name}`).value;
+                inputVals[inp.name] = val;
+            });
+
+            document.getElementById('visInput').innerText = Object.values(inputVals).join(', ');
+        }
+
+        function executeFunctionMachine() {
+            if (!activeMachineObj) return;
+
+            const inputVals = {};
+            activeMachineObj.inputs.forEach(inp => {
+                const val = document.getElementById(`input_${inp.name}`).value;
+                inputVals[inp.name] = val;
+            });
+
+            const result = activeMachineObj.evaluate(inputVals);
+            document.getElementById('visOutput').innerText = result.output;
+
+            if (result.isCorrect) {
+                playSound('success');
+                logConsole(`[OK] Función validada con resultado (${result.output}).`);
+                logConsole(`Compuerta activada.`);
+
+                const lvl = levels[currentLevelIndex];
+                lvl.doorOpen = true;
+
+                setTimeout(() => {
+                    closeModal();
+                    renderMinimap();
+                }, 600);
+            } else {
+                playSound('error');
+                logConsole(`[ERROR] Salida (${result.output}) no coincide con el objetivo (${activeMachineObj.targetDisplay}).`);
+            }
+        }
+
+        // START ENGINE
+        window.onload = () => {
+            initLevel(0);
+            renderCanvas();
+        };
+    </script>
+</body>
+</html>
+</body>
+</html>
